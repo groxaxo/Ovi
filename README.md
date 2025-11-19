@@ -54,6 +54,16 @@ Ovi is a veo-3-like, **video + audio generation model** that simultaneously gene
 - **🎬 Create videos now on wavespeed.ai**: https://wavespeed.ai/models/character-ai/ovi/image-to-video & https://wavespeed.ai/models/character-ai/ovi/text-to-video
 - **🎬 Create videos now on HuggingFace**: https://huggingface.co/spaces/akhaliq/Ovi
 
+### 🆕 Advanced Features (New!)
+- **🌐 Modern Web Interface**: Beautiful Open WebUI-inspired interface with real-time queue management
+- **⚡ Optimized Multi-GPU**: Enhanced sequence parallel and FSDP sharded inference for Ampere GPUs (RTX 3090)
+- **🔄 Unlimited Queue System**: Progressive video generation with automated queue processing
+- **🚀 LoRA Lightning**: Fast inference with LoRA adapters for custom styles
+- **📊 Real-time Progress**: Live WebSocket updates for generation progress
+- **🎯 Prompt Templates**: Pre-made templates for quick video creation
+
+See [ADVANCED_FEATURES.md](ADVANCED_FEATURES.md) for detailed documentation.
+
 ### 🎯 10-second examples
 
 <div align="center"><table><tr>
@@ -119,8 +129,12 @@ Ovi is a veo-3-like, **video + audio generation model** that simultaneously gene
   - [x] Multi-GPU inference with or without the support of sequence parallel
   - [x] fp8 weights and improved memory efficiency (credits to [@rkfg](https://github.com/rkfg))
   - [x] qint8 quantization thanks to [@gluttony-10](https://github.com/character-ai/Ovi/commits?author=gluttony-10)
-  - [ ] Improve efficiency of Sequence Parallel implementation
-  - [ ] Implement Sharded inference with FSDP
+  - [x] **Improve efficiency of Sequence Parallel implementation** ✨
+  - [x] **Implement Sharded inference with FSDP** ✨
+  - [x] **Modern Web Interface (Open WebUI-inspired)** ✨
+  - [x] **Queue System with Unlimited Length** ✨
+  - [x] **LoRA Lightning Support for Fast Inference** ✨
+  - [x] **Optimizations for Ampere GPUs (RTX 3090)** ✨
 - [x] Video creation example prompts and format
 - [x] Finetune model with higher resolution data, and RL for performance improvement. 
 - [x] Longer video generation (10s)
@@ -294,6 +308,57 @@ python3 gradio_app.py --cpu_offload --qint8
 python3 gradio_app.py --cpu_offload --fp8
 
 ```
+
+### 🌐 Modern Web Interface (New!)
+
+We now provide a beautiful, modern web interface inspired by Open WebUI with real-time queue management:
+
+```bash
+# Easy one-command startup
+./start_web_interface.sh
+```
+
+This will start both the API server and frontend. Visit `http://localhost:3000` to use the interface.
+
+**Features:**
+- 🎨 Beautiful dark-themed UI with smooth animations
+- 📱 Responsive design for mobile and desktop
+- 🔄 Real-time queue management with WebSocket updates
+- 📝 Prompt templates for quick start
+- ⚙️ Full control over all generation parameters
+- 📊 Live progress tracking
+
+**Manual Startup:**
+
+```bash
+# Terminal 1: Start API server
+pip install -r requirements_api.txt
+python3 api_server.py
+
+# Terminal 2: Start frontend
+cd frontend
+npm install
+npm run dev
+```
+
+**Advanced Multi-GPU with Web Interface:**
+
+The web interface automatically uses your configured multi-GPU setup. Edit `ovi/configs/inference/inference_fusion.yaml`:
+
+```yaml
+# Enable FSDP for memory-efficient multi-GPU
+use_fsdp: true
+fsdp_sharding_strategy: "FULL_SHARD"  # or "SHARD_GRAD_OP"
+
+# Enable optimized communications
+use_optimized_comms: true
+
+# Sequence parallel (if not using FSDP)
+sp_size: 4  # Number of GPUs
+```
+
+See [ADVANCED_FEATURES.md](ADVANCED_FEATURES.md) for detailed configuration.
+
 ---
 
 ## 🙏 Acknowledgements
