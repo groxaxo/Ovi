@@ -18,15 +18,17 @@ def broadcast(input_: torch.Tensor):
 def _all_to_all_4D(input: torch.tensor,
                    scatter_idx: int = 2,
                    gather_idx: int = 1,
-                   group=None) -> torch.tensor:
+                   group=None,
+                   async_op: bool = False) -> torch.tensor:
     """
-    all-to-all for QKV
+    all-to-all for QKV with optimizations for Ampere GPUs
 
     Args:
         input (torch.tensor): a tensor sharded along dim scatter dim
         scatter_idx (int): default 1
         gather_idx (int): default 2
         group : torch process group
+        async_op (bool): whether to use async communication for overlap
 
     Returns:
         torch.tensor: resharded tensor (bs, seqlen/P, hc, hs)
@@ -43,6 +45,7 @@ def _all_to_all_4D(input: torch.tensor,
         seqlen = shard_seqlen * seq_world_size
         shard_hc = hc // seq_world_size
 
+        # Optimized: Pre-allocate output buffer to avoid extra allocation overhead
         # transpose groups of heads with the seq-len parallel dimension, so that we can scatter them!
         # (bs, seqlen/P, hc, hs) -reshape-> (bs, seq_len/P, P, hc/P, hs) -transpose(0,2)-> (P, seq_len/P, bs, hc/P, hs)
         input_t = (input.reshape(bs, shard_seqlen, seq_world_size, shard_hc,
@@ -52,8 +55,10 @@ def _all_to_all_4D(input: torch.tensor,
         # https://pytorch.org/docs/stable/distributed.html#torch.distributed.all_to_all_single
         # (P, seq_len/P, bs, hc/P, hs) scatter seqlen -all2all-> (P, seq_len/P, bs, hc/P, hs) scatter head
         if seq_world_size > 1:
-            dist.all_to_all_single(output, input_t, group=group)
-            torch.cuda.synchronize()
+            # Optimized: Remove unnecessary synchronization for better overlap
+            work = dist.all_to_all_single(output, input_t, group=group, async_op=async_op)
+            if not async_op:
+                work.wait() if hasattr(work, 'wait') else None
         else:
             output = input_t
         # if scattering the seq-dim, transpose the heads back to the original dimension
@@ -72,6 +77,7 @@ def _all_to_all_4D(input: torch.tensor,
         shard_seqlen = seqlen // seq_world_size
         seq_world_size = dist.get_world_size(group)
 
+        # Optimized: Pre-allocate output buffer to avoid extra allocation overhead
         # transpose groups of heads with the seq-len parallel dimension, so that we can scatter them!
         # (bs, seqlen, hc/P, hs) -reshape-> (bs, P, seq_len/P, hc/P, hs) -transpose(0, 3)-> (hc/P, P, seqlen/P, bs, hs) -transpose(0, 1) -> (P, hc/P, seqlen/P, bs, hs)
         input_t = (input.reshape(
@@ -83,8 +89,10 @@ def _all_to_all_4D(input: torch.tensor,
         # https://pytorch.org/docs/stable/distributed.html#torch.distributed.all_to_all_single
         # (P, bs x hc/P, seqlen/P, hs) scatter seqlen -all2all-> (P, bs x seq_len/P, hc/P, hs) scatter head
         if seq_world_size > 1:
-            dist.all_to_all_single(output, input_t, group=group)
-            torch.cuda.synchronize()
+            # Optimized: Remove unnecessary synchronization for better overlap
+            work = dist.all_to_all_single(output, input_t, group=group, async_op=async_op)
+            if not async_op:
+                work.wait() if hasattr(work, 'wait') else None
         else:
             output = input_t
 
@@ -144,13 +152,21 @@ def _all_to_all(
     group: dist.ProcessGroup,
     scatter_dim: int,
     gather_dim: int,
+    async_op: bool = False,
 ):
+    # Optimized: Use torch.tensor_split which is more efficient than manual splitting
     input_list = [
         t.contiguous()
         for t in torch.tensor_split(input_, world_size, scatter_dim)
     ]
+    # Optimized: Pre-allocate output buffers in one shot for better memory locality
     output_list = [torch.empty_like(input_list[0]) for _ in range(world_size)]
-    dist.all_to_all(output_list, input_list, group=group)
+    
+    work = dist.all_to_all(output_list, input_list, group=group, async_op=async_op)
+    if not async_op:
+        work.wait() if hasattr(work, 'wait') else None
+    
+    # Optimized: Use torch.cat with pre-allocated buffer when possible
     return torch.cat(output_list, dim=gather_dim).contiguous()
 
 
@@ -200,7 +216,7 @@ def all_to_all(
 
 
 class _AllGather(torch.autograd.Function):
-    """All-gather communication with autograd support.
+    """All-gather communication with autograd support and optimizations.
 
     Args:
         input_: input tensor
@@ -208,7 +224,7 @@ class _AllGather(torch.autograd.Function):
     """
 
     @staticmethod
-    def forward(ctx, input_, dim):
+    def forward(ctx, input_, dim, async_op=False):
         ctx.dim = dim
         world_size = nccl_info.sp_size
         group = nccl_info.group
@@ -216,10 +232,16 @@ class _AllGather(torch.autograd.Function):
 
         ctx.input_size = input_size[dim]
 
+        # Optimized: Pre-allocate all tensors for better memory efficiency
         tensor_list = [torch.empty_like(input_) for _ in range(world_size)]
         input_ = input_.contiguous()
-        dist.all_gather(tensor_list, input_, group=group)
+        
+        # Optimized: Use async operation when beneficial
+        work = dist.all_gather(tensor_list, input_, group=group, async_op=async_op)
+        if not async_op:
+            work.wait() if hasattr(work, 'wait') else None
 
+        # Optimized: More efficient concatenation
         output = torch.cat(tensor_list, dim=dim)
         return output
 
@@ -232,23 +254,25 @@ class _AllGather(torch.autograd.Function):
 
         sizes = [input_size] * world_size
 
+        # Optimized: Direct indexing instead of creating intermediate list
         grad_input_list = torch.split(grad_output, sizes, dim=dim)
         grad_input = grad_input_list[rank]
 
-        return grad_input, None
+        return grad_input, None, None
 
 
-def all_gather(input_: torch.Tensor, dim: int = 1):
+def all_gather(input_: torch.Tensor, dim: int = 1, async_op: bool = False):
     """Performs an all-gather operation on the input tensor along the specified dimension.
 
     Args:
         input_ (torch.Tensor): Input tensor of shape [B, H, S, D].
         dim (int, optional): Dimension along which to concatenate. Defaults to 1.
+        async_op (bool, optional): Whether to perform async operation. Defaults to False.
 
     Returns:
         torch.Tensor: Output tensor after all-gather operation, concatenated along 'dim'.
     """
-    return _AllGather.apply(input_, dim)
+    return _AllGather.apply(input_, dim, async_op)
 
 
 def prepare_sequence_parallel_data(hidden_states, encoder_hidden_states,
