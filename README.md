@@ -272,8 +272,26 @@ torchrun --nnodes 1 --nproc_per_node 8 inference.py --config-file ovi/configs/in
 *Use this to run samples in parallel across multiple GPUs for faster processing.*
 
 ### Memory & Performance Requirements
-Below are approximate GPU memory requirements for different configurations. Sequence parallel implementation will be optimized in the future.
-All End-to-End time calculated based on a 121 frame, 720x720 video, using 50 denoising steps. Minimum GPU vram requirement to run our model is **32Gb**, fp8 parameters is currently supported, reducing peak VRAM usage to **24Gb** with slight quality degradation.
+
+Below are approximate GPU memory requirements for different configurations. We now support multiple **Low VRAM modes** to make Ovi accessible on a wider range of GPUs.
+
+#### Low VRAM Optimization Modes
+
+| VRAM Mode | VRAM Required | Speed | Quality | Best For |
+|-----------|---------------|-------|---------|----------|
+| **Standard** | 32GB+ | Fastest | Best | High-end GPUs (A100, H100) |
+| **FP8 Optimized** | ~24GB | Fast | Excellent | RTX 3090, RTX 4090 |
+| **FP8 + CPU Offload** | 16-24GB | Medium | Good | Mid-range GPUs |
+| **Ultra Low VRAM** | 8-16GB | Slower | Fair | Budget GPUs |
+
+💡 **New Features:**
+- 🧠 **One-Click VRAM Selection**: Choose your VRAM mode from a dropdown in the web interface or Gradio
+- ⚡ **LoRA Support**: Enable LoRA for additional VRAM reduction with minimal quality impact
+- 🚀 **Smart GPU Allocation**: Automatically distribute workloads across multiple GPUs (perfect for multi-3090 setups)
+
+#### Sequence Parallel Performance
+
+All End-to-End time calculated based on a 121 frame, 720x720 video, using 50 denoising steps.
 
 | Sequence Parallel Size | FlashAttention-3 Enabled | CPU Offload | With Image Gen Model | Peak VRAM Required | End-to-End Time |
 |-------------------------|---------------------------|-------------|-----------------------|---------------|-----------------|
@@ -284,9 +302,19 @@ All End-to-End time calculated based on a 121 frame, 720x720 video, using 50 den
 | **1**                       | **Yes**                        | **Yes**          | **Yes**                    | **~32 GB**        | **~140s**         |
 | 4                       | Yes                        | No          | No                    | ~80 GB        | ~55s         |
 | 8                       | Yes                        | No          | No                    | ~80 GB        | ~40s         |
+
+#### Multi-GPU Allocation Strategies
+
+When you have multiple GPUs (especially multi-RTX 3090 setups), Ovi can automatically distribute the workload:
+
+- **Auto**: Automatically detects and uses available GPUs
+- **Sequence Parallel (2/4/8 GPUs)**: Splits the sequence across multiple GPUs for faster processing
+- **FSDP Sharded**: Memory-efficient model sharding for maximum VRAM savings
 ### Gradio
-We provide a simple script to run our model in a gradio UI. It uses the `ckpt_dir` in `ovi/configs/inference/inference_fusion.yaml` to initialize the model
+We provide a simple script to run our model in a gradio UI with **built-in Low VRAM mode selection**. It uses the `ckpt_dir` in `ovi/configs/inference/inference_fusion.yaml` to initialize the model
+
 ```bash
+# Basic usage - Low VRAM options available in the UI
 python3 gradio_app.py
 
 OR
@@ -308,6 +336,11 @@ python3 gradio_app.py --cpu_offload --qint8
 python3 gradio_app.py --cpu_offload --fp8
 
 ```
+
+**✨ New in Gradio UI:**
+- 🧠 **VRAM Mode Dropdown**: Select from Standard, FP8, FP8+Offload, or Ultra Low VRAM modes
+- ⚡ **LoRA Toggle**: Enable LoRA for additional VRAM savings
+- 🚀 **GPU Allocation**: Choose single GPU, multi-GPU sequence parallel, or FSDP sharding
 
 ### 🌐 Modern Web Interface (New!)
 

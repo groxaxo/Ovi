@@ -26,3 +26,8 @@ fsdp_cpu_offload: False  # Offload FSDP parameters to CPU (use with FSDP)
 use_optimized_comms: True  # Use optimized communication primitives for Ampere GPUs
 enable_async_comms: False  # Enable async communication overlap (experimental)
 use_tensor_cores: True  # Optimize for Tensor Cores on Ampere GPUs (auto-enabled for bf16)
+
+# Low VRAM and Multi-GPU Options (New)
+vram_mode: "standard"  # ["standard", "fp8", "fp8_offload", "ultra_low"] - VRAM optimization mode
+enable_lora: False  # Enable LoRA for reduced VRAM consumption
+gpu_allocation: "auto"  # ["auto", "single", "multi_2", "multi_4", "multi_8", "fsdp"] - GPU distribution strategy

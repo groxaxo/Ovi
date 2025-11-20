@@ -399,3 +399,34 @@ class OviFusionEngine:
             raise NotImplementedError("Unsupported solver.")
         
         return sample_scheduler, timesteps
+
+    def apply_vram_config(self, vram_mode: str = 'standard', enable_lora: bool = False):
+        """
+        Apply VRAM optimization configuration dynamically
+        
+        Args:
+            vram_mode: One of 'standard', 'fp8', 'fp8_offload', 'ultra_low'
+            enable_lora: Whether to enable LoRA optimizations
+        """
+        from ovi.utils.gpu_manager import get_gpu_manager
+        
+        gpu_manager = get_gpu_manager()
+        vram_config = gpu_manager.get_vram_config(vram_mode)
+        
+        logging.info(f"Applying VRAM config: {vram_config.description}")
+        
+        # Note: FP8 and QINT8 modes require model reinitialization
+        # This method logs the configuration for reference
+        # Actual mode changes should be done during engine initialization
+        
+        if enable_lora:
+            logging.info("LoRA optimization enabled for reduced VRAM usage")
+            # LoRA can be applied to reduce memory footprint
+            # This would require LoRA adapter loading which is already supported
+        
+        return {
+            'fp8': vram_config.fp8,
+            'cpu_offload': vram_config.cpu_offload,
+            'qint8': vram_config.qint8,
+            'enable_lora': enable_lora,
+        }

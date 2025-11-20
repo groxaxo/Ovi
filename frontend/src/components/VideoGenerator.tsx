@@ -22,6 +22,9 @@ const VideoGenerator: React.FC = () => {
     duration: '10s',
     solver: 'unipc',
     slgLayer: 11,
+    vramMode: 'standard',
+    enableLora: false,
+    gpuAllocation: 'auto',
   });
 
   const handleGenerate = () => {
@@ -171,74 +174,139 @@ const VideoGenerator: React.FC = () => {
               animate={{ height: 'auto', opacity: 1 }}
               className="mt-4 space-y-4 p-4 bg-gray-700/50 rounded-lg"
             >
-              <div className="grid grid-cols-2 gap-4">
+              {/* VRAM Mode Section */}
+              <div className="pb-4 border-b border-gray-600">
+                <h3 className="text-sm font-semibold text-white mb-3">🧠 Memory Optimization</h3>
+                <div className="space-y-3">
+                  <div>
+                    <label className="label text-xs">VRAM Mode</label>
+                    <select
+                      value={options.vramMode}
+                      onChange={(e) => setOptions({ ...options, vramMode: e.target.value })}
+                      className="select text-sm w-full"
+                    >
+                      <option value="standard">Standard (32GB+ VRAM)</option>
+                      <option value="fp8">FP8 Optimized (24GB VRAM)</option>
+                      <option value="fp8_offload">FP8 + CPU Offload (16-24GB VRAM)</option>
+                      <option value="ultra_low">Ultra Low VRAM (8-16GB VRAM)</option>
+                    </select>
+                    <p className="text-xs text-gray-400 mt-1">
+                      {options.vramMode === 'standard' && 'Best quality, requires high-end GPU'}
+                      {options.vramMode === 'fp8' && 'Good quality with reduced VRAM usage'}
+                      {options.vramMode === 'fp8_offload' && 'Balanced performance for mid-range GPUs'}
+                      {options.vramMode === 'ultra_low' && 'Slowest but works on low VRAM GPUs'}
+                    </p>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="enableLora"
+                      checked={options.enableLora}
+                      onChange={(e) => setOptions({ ...options, enableLora: e.target.checked })}
+                      className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-primary-500 focus:ring-primary-500"
+                    />
+                    <label htmlFor="enableLora" className="text-xs text-gray-300">
+                      Enable LoRA (reduces VRAM consumption further)
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Multi-GPU Section */}
+              <div className="pb-4 border-b border-gray-600">
+                <h3 className="text-sm font-semibold text-white mb-3">🚀 Multi-GPU Settings</h3>
                 <div>
-                  <label className="label text-xs">Resolution</label>
+                  <label className="label text-xs">GPU Allocation</label>
                   <select
-                    value={options.resolution}
-                    onChange={(e) => setOptions({ ...options, resolution: e.target.value })}
-                    className="select text-sm"
+                    value={options.gpuAllocation}
+                    onChange={(e) => setOptions({ ...options, gpuAllocation: e.target.value })}
+                    className="select text-sm w-full"
                   >
-                    <option value="720x720">720x720</option>
-                    <option value="960x960">960x960</option>
-                    <option value="704x1280">704x1280 (9:16)</option>
-                    <option value="1280x704">1280x704 (16:9)</option>
+                    <option value="auto">Auto (Distribute Automatically)</option>
+                    <option value="single">Single GPU</option>
+                    <option value="multi_2">2 GPUs (Sequence Parallel)</option>
+                    <option value="multi_4">4 GPUs (Sequence Parallel)</option>
+                    <option value="multi_8">8 GPUs (Sequence Parallel)</option>
+                    <option value="fsdp">FSDP Sharded (Memory Efficient)</option>
                   </select>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Optimize workload distribution across available GPUs
+                  </p>
                 </div>
-                <div>
-                  <label className="label text-xs">Duration</label>
-                  <select
-                    value={options.duration}
-                    onChange={(e) => setOptions({ ...options, duration: e.target.value })}
-                    className="select text-sm"
-                  >
-                    <option value="5s">5 seconds</option>
-                    <option value="10s">10 seconds</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="label text-xs">Seed</label>
-                  <input
-                    type="number"
-                    value={options.seed}
-                    onChange={(e) => setOptions({ ...options, seed: parseInt(e.target.value) })}
-                    className="input text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="label text-xs">Steps</label>
-                  <input
-                    type="number"
-                    value={options.steps}
-                    onChange={(e) => setOptions({ ...options, steps: parseInt(e.target.value) })}
-                    className="input text-sm"
-                    min="20"
-                    max="100"
-                  />
-                </div>
-                <div>
-                  <label className="label text-xs">Video Guidance</label>
-                  <input
-                    type="number"
-                    value={options.videoGuidance}
-                    onChange={(e) => setOptions({ ...options, videoGuidance: parseFloat(e.target.value) })}
-                    className="input text-sm"
-                    step="0.5"
-                    min="0"
-                    max="10"
-                  />
-                </div>
-                <div>
-                  <label className="label text-xs">Audio Guidance</label>
-                  <input
-                    type="number"
-                    value={options.audioGuidance}
-                    onChange={(e) => setOptions({ ...options, audioGuidance: parseFloat(e.target.value) })}
-                    className="input text-sm"
-                    step="0.5"
-                    min="0"
-                    max="10"
-                  />
+              </div>
+
+              {/* Generation Parameters Section */}
+              <div>
+                <h3 className="text-sm font-semibold text-white mb-3">⚙️ Generation Parameters</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="label text-xs">Resolution</label>
+                    <select
+                      value={options.resolution}
+                      onChange={(e) => setOptions({ ...options, resolution: e.target.value })}
+                      className="select text-sm"
+                    >
+                      <option value="720x720">720x720</option>
+                      <option value="960x960">960x960</option>
+                      <option value="704x1280">704x1280 (9:16)</option>
+                      <option value="1280x704">1280x704 (16:9)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label text-xs">Duration</label>
+                    <select
+                      value={options.duration}
+                      onChange={(e) => setOptions({ ...options, duration: e.target.value })}
+                      className="select text-sm"
+                    >
+                      <option value="5s">5 seconds</option>
+                      <option value="10s">10 seconds</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label text-xs">Seed</label>
+                    <input
+                      type="number"
+                      value={options.seed}
+                      onChange={(e) => setOptions({ ...options, seed: parseInt(e.target.value) })}
+                      className="input text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="label text-xs">Steps</label>
+                    <input
+                      type="number"
+                      value={options.steps}
+                      onChange={(e) => setOptions({ ...options, steps: parseInt(e.target.value) })}
+                      className="input text-sm"
+                      min="20"
+                      max="100"
+                    />
+                  </div>
+                  <div>
+                    <label className="label text-xs">Video Guidance</label>
+                    <input
+                      type="number"
+                      value={options.videoGuidance}
+                      onChange={(e) => setOptions({ ...options, videoGuidance: parseFloat(e.target.value) })}
+                      className="input text-sm"
+                      step="0.5"
+                      min="0"
+                      max="10"
+                    />
+                  </div>
+                  <div>
+                    <label className="label text-xs">Audio Guidance</label>
+                    <input
+                      type="number"
+                      value={options.audioGuidance}
+                      onChange={(e) => setOptions({ ...options, audioGuidance: parseFloat(e.target.value) })}
+                      className="input text-sm"
+                      step="0.5"
+                      min="0"
+                      max="10"
+                    />
+                  </div>
                 </div>
               </div>
             </motion.div>

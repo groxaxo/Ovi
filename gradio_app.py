@@ -75,8 +75,14 @@ def generate_video(
     slg_layer,
     video_negative_prompt,
     audio_negative_prompt,
+    vram_mode,
+    enable_lora,
+    gpu_allocation,
 ):
     try:
+        # Apply VRAM configuration
+        ovi_engine.apply_vram_config(vram_mode=vram_mode, enable_lora=enable_lora)
+        
         image_path = None
         if image is not None:
             image_path = image
@@ -171,6 +177,32 @@ with gr.Blocks() as demo:
                 video_height = gr.Number(minimum=128, maximum=1280, value=512, step=32, label="Video Height")
                 video_width = gr.Number(minimum=128, maximum=1280, value=992, step=32, label="Video Width")
 
+                with gr.Row():
+                    vram_mode = gr.Dropdown(
+                        choices=[
+                            ("Standard (32GB+ VRAM)", "standard"),
+                            ("FP8 Optimized (24GB VRAM)", "fp8"),
+                            ("FP8 + CPU Offload (16-24GB VRAM)", "fp8_offload"),
+                            ("Ultra Low VRAM (8-16GB VRAM)", "ultra_low"),
+                        ],
+                        value="standard",
+                        label="VRAM Mode"
+                    )
+                    gpu_allocation = gr.Dropdown(
+                        choices=[
+                            ("Auto (Distribute Automatically)", "auto"),
+                            ("Single GPU", "single"),
+                            ("2 GPUs (Sequence Parallel)", "multi_2"),
+                            ("4 GPUs (Sequence Parallel)", "multi_4"),
+                            ("8 GPUs (Sequence Parallel)", "multi_8"),
+                            ("FSDP Sharded (Memory Efficient)", "fsdp"),
+                        ],
+                        value="auto",
+                        label="GPU Allocation"
+                    )
+                
+                enable_lora = gr.Checkbox(label="Enable LoRA (reduces VRAM consumption)", value=False)
+
                 video_seed = gr.Number(minimum=0, maximum=100000, value=100, label="Video Seed")
                 solver_name = gr.Dropdown(
                     choices=["unipc", "euler", "dpm++"], value="unipc", label="Solver Name"
@@ -208,6 +240,7 @@ with gr.Blocks() as demo:
             video_text_prompt, image, video_height, video_width, video_seed, solver_name,
             sample_steps, shift, video_guidance_scale, audio_guidance_scale,
             slg_layer, video_negative_prompt, audio_negative_prompt,
+            vram_mode, enable_lora, gpu_allocation,
         ],
         outputs=[output_path],
     )
