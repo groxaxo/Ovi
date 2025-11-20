@@ -1,0 +1,12 @@
+# Additional requirements for API server and frontend
+fastapi>=0.104.1
+uvicorn[standard]>=0.24.0
+python-socketio>=5.10.0
+python-multipart>=0.0.6
+aiofiles>=23.2.1
+pydantic>=2.5.0
+
+# Optional: For production deployment
+gunicorn>=21.2.0
+redis>=5.0.1  # For distributed queue (optional)
+celery>=5.3.4  # For distributed task processing (optional)
