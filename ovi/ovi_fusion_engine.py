@@ -211,7 +211,7 @@ class OviFusionEngine:
                 # input resolution should be at least 0.9x of video area of model spec
                 input_area = video_frame_height_width[0] * video_frame_height_width[1]
                 if input_area < 0.9 * self.target_area or input_area > 1.1 * self.target_area:
-                    logging.warning(f"[Detected model: {self.model_name}] Input video frame area {input_area} is more than 10\% smaller or larger than model's target area {self.target_area}. This may lead to suboptimal results, please refer to readme for best resolutions or use the right model. DEFAULTING TO MODEL'S TARGET AREA while preserving given aspect ratio.")
+                    logging.warning(f"[Detected model: {self.model_name}] Input video frame area {input_area} is more than 10% smaller or larger than model's target area {self.target_area}. This may lead to suboptimal results, please refer to readme for best resolutions or use the right model. DEFAULTING TO MODEL'S TARGET AREA while preserving given aspect ratio.")
 
                 video_h, video_w = video_frame_height_width
                 video_h, video_w = snap_hw_to_multiple_of_32(video_h, video_w, area = self.target_area)
