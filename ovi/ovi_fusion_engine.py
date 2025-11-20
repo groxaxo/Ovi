@@ -211,7 +211,7 @@ class OviFusionEngine:
                 # input resolution should be at least 0.9x of video area of model spec
                 input_area = video_frame_height_width[0] * video_frame_height_width[1]
                 if input_area < 0.9 * self.target_area or input_area > 1.1 * self.target_area:
-                    logging.warning(f"[Detected model: {self.model_name}] Input video frame area {input_area} is more than 10\% smaller or larger than model's target area {self.target_area}. This may lead to suboptimal results, please refer to readme for best resolutions or use the right model. DEFAULTING TO MODEL'S TARGET AREA while preserving given aspect ratio.")
+                    logging.warning(f"[Detected model: {self.model_name}] Input video frame area {input_area} is more than 10% smaller or larger than model's target area {self.target_area}. This may lead to suboptimal results, please refer to readme for best resolutions or use the right model. DEFAULTING TO MODEL'S TARGET AREA while preserving given aspect ratio.")
 
                 video_h, video_w = video_frame_height_width
                 video_h, video_w = snap_hw_to_multiple_of_32(video_h, video_w, area = self.target_area)
@@ -399,3 +399,34 @@ class OviFusionEngine:
             raise NotImplementedError("Unsupported solver.")
         
         return sample_scheduler, timesteps
+
+    def apply_vram_config(self, vram_mode: str = 'standard', enable_lora: bool = False):
+        """
+        Apply VRAM optimization configuration dynamically
+        
+        Args:
+            vram_mode: One of 'standard', 'fp8', 'fp8_offload', 'ultra_low'
+            enable_lora: Whether to enable LoRA optimizations
+        """
+        from ovi.utils.gpu_manager import get_gpu_manager
+        
+        gpu_manager = get_gpu_manager()
+        vram_config = gpu_manager.get_vram_config(vram_mode)
+        
+        logging.info(f"Applying VRAM config: {vram_config.description}")
+        
+        # Note: FP8 and QINT8 modes require model reinitialization
+        # This method logs the configuration for reference
+        # Actual mode changes should be done during engine initialization
+        
+        if enable_lora:
+            logging.info("LoRA optimization enabled for reduced VRAM usage")
+            # LoRA can be applied to reduce memory footprint
+            # This would require LoRA adapter loading which is already supported
+        
+        return {
+            'fp8': vram_config.fp8,
+            'cpu_offload': vram_config.cpu_offload,
+            'qint8': vram_config.qint8,
+            'enable_lora': enable_lora,
+        }

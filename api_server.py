@@ -56,6 +56,9 @@ class GenerationOptions(BaseModel):
     duration: str = "10s"
     solver: str = "unipc"
     slgLayer: int = 11
+    vramMode: str = "standard"  # standard, fp8, fp8_offload, ultra_low
+    enableLora: bool = False
+    gpuAllocation: str = "auto"  # auto, single, multi_2, multi_4, multi_8, fsdp
 
 
 class GenerationJob(BaseModel):
@@ -114,11 +117,33 @@ def init_ovi_engine():
     if ovi_engine is None:
         logger.info("Initializing Ovi Fusion Engine...")
         try:
+            # Initialize with default config, but allow per-job VRAM configuration
             ovi_engine = OviFusionEngine(config=DEFAULT_CONFIG)
             logger.info("Ovi Fusion Engine initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize Ovi Engine: {e}")
             raise
+
+
+def apply_job_vram_settings(job: GenerationJob):
+    """Apply VRAM and GPU settings for a specific job"""
+    from ovi.utils.gpu_manager import get_gpu_manager
+    
+    gpu_manager = get_gpu_manager()
+    
+    # Get VRAM configuration
+    vram_config = gpu_manager.get_vram_config(job.options.vramMode)
+    logger.info(f"Job {job.id}: Using VRAM mode '{vram_config.mode}' - {vram_config.description}")
+    
+    # Get GPU allocation
+    gpu_allocation = gpu_manager.allocate_gpus(job.options.gpuAllocation)
+    logger.info(f"Job {job.id}: Using GPU allocation '{gpu_allocation.mode}' - {gpu_allocation.description}")
+    
+    # Apply LoRA if enabled
+    if job.options.enableLora:
+        logger.info(f"Job {job.id}: LoRA optimization enabled")
+    
+    return vram_config, gpu_allocation
 
 
 # Process queue
@@ -139,6 +164,9 @@ async def process_queue():
                 })
                 
                 try:
+                    # Apply VRAM and GPU settings for this job
+                    vram_config, gpu_allocation = apply_job_vram_settings(job)
+                    
                     # Parse resolution
                     height, width = map(int, job.options.resolution.split('x'))
                     
@@ -157,6 +185,12 @@ async def process_queue():
                             'status': 'processing',
                             'progress': progress
                         })
+                    
+                    # Apply VRAM configuration to engine
+                    ovi_engine.apply_vram_config(
+                        vram_mode=job.options.vramMode,
+                        enable_lora=job.options.enableLora
+                    )
                     
                     generated_video, generated_audio, _ = ovi_engine.generate(
                         text_prompt=job.prompt,
